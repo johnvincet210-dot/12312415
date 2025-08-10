@@ -566,3 +566,113 @@ oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(...)
     end
     return oldNamecall(...)
 end))
+
+
+-- CONFIGURATION
+local useDisplayName = true -- false = Username
+local font = Enum.Font.SourceSansBold
+local toggleKey = Enum.KeyCode.H
+local enabled = true
+
+-- SERVICES
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- ✅ CREATE CENTER CROSSHAIR DOT
+local function createCrosshair()
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "CrosshairDot"
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+	local dot = Instance.new("Frame")
+	dot.Name = "Dot"
+	dot.Size = UDim2.new(0, 12, 0, 12) -- Bigger size
+	dot.Position = UDim2.new(0.5, 0, 0.5, 0) -- Center middle
+	dot.AnchorPoint = Vector2.new(0.5, 0.5)
+	dot.BackgroundColor3 = Color3.fromRGB(0, 255, 255) -- Cyan
+	dot.BorderSizePixel = 0
+	dot.BackgroundTransparency = 0
+	dot.Parent = gui
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(1, 0)
+	corner.Parent = dot
+end
+
+-- ✅ CREATE NAME TAG FOR A CHARACTER
+local function createNametag(character)
+	local player = Players:GetPlayerFromCharacter(character)
+	if not player or player == LocalPlayer then return end
+
+	local head = character:FindFirstChild("Head") or character:WaitForChild("Head", 5)
+	if not head or head:FindFirstChild("NameTagESP") then return end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "NameTagESP"
+	billboard.Adornee = head
+	billboard.Size = UDim2.new(0, 100, 0, 20)
+	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Enabled = enabled
+	billboard.Parent = head
+
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Size = UDim2.new(1, 0, 1, 0)
+	textLabel.BackgroundTransparency = 1
+	textLabel.TextColor3 = player.TeamColor.Color
+	textLabel.TextStrokeTransparency = 0.5
+	textLabel.Font = font
+	textLabel.TextSize = 14
+	textLabel.Text = useDisplayName and player.DisplayName or player.Name
+	textLabel.Parent = billboard
+
+	player:GetPropertyChangedSignal("DisplayName"):Connect(function()
+		if useDisplayName then
+			textLabel.Text = player.DisplayName
+		end
+	end)
+
+	player:GetPropertyChangedSignal("TeamColor"):Connect(function()
+		textLabel.TextColor3 = player.TeamColor.Color
+	end)
+end
+
+-- ✅ INITIALIZE TAGS FOR EXISTING PLAYERS
+for _, player in ipairs(Players:GetPlayers()) do
+	if player ~= LocalPlayer and player.Character then
+		createNametag(player.Character)
+	end
+	player.CharacterAdded:Connect(function(char)
+		task.wait(1)
+		createNametag(char)
+	end)
+end
+
+-- ✅ FUTURE PLAYERS JOINING
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function(char)
+		task.wait(1)
+		createNametag(char)
+	end)
+end)
+
+-- ✅ TOGGLE NAME TAGS ON/OFF WITH KEY
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed or input.KeyCode ~= toggleKey then return end
+	enabled = not enabled
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character then
+			local head = player.Character:FindFirstChild("Head")
+			if head and head:FindFirstChild("NameTagESP") then
+				head.NameTagESP.Enabled = enabled
+			end
+		end
+	end
+end)
+
+-- ✅ CREATE CROSSHAIR ON SCREEN
+createCrosshair()
